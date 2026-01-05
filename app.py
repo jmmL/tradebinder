@@ -3,6 +3,8 @@ import os
 import json
 from models import db, Trade
 import card_data
+from apscheduler.schedulers.background import BackgroundScheduler
+import atexit
 
 app = Flask(__name__)
 
@@ -17,11 +19,25 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
+# Scheduler Setup
+scheduler = BackgroundScheduler()
+
+def scheduled_update():
+    """Wrapper to run update_card_database with app context."""
+    with app.app_context():
+        card_data.update_card_database(app)
+
+scheduler.add_job(func=scheduled_update, trigger="interval", weeks=1)
+scheduler.start()
+
+# Shut down the scheduler when exiting the app
+atexit.register(lambda: scheduler.shutdown())
+
 # Create tables before first request
 with app.app_context():
     db.create_all()
-    # Pre-load card data
-    card_data.load_card_data()
+    # Pre-load card data (checks DB, updates if stale/missing)
+    card_data.load_card_data(app)
 
 @app.route('/')
 def index():
@@ -31,7 +47,8 @@ def index():
 def validate():
     data = request.get_json()
     raw_list = data.get('cards', '')
-    valid, unknown = card_data.validate_card_list(raw_list)
+    # Pass app just in case it needs to load data (though it should be loaded on start)
+    valid, unknown = card_data.validate_card_list(raw_list, app)
     return jsonify({'valid': valid, 'unknown': unknown})
 
 @app.route('/create', methods=['POST'])
@@ -42,7 +59,7 @@ def create_trade():
     if not mode or not raw_list:
         return "Missing data", 400
 
-    valid, _ = card_data.validate_card_list(raw_list)
+    valid, _ = card_data.validate_card_list(raw_list, app)
 
     if not valid:
         return "No valid cards found", 400
@@ -65,7 +82,7 @@ def view_trade(trade_id):
         # User 2 submitting their list
         raw_list = request.form.get('partner_card_list')
         if raw_list:
-            valid, _ = card_data.validate_card_list(raw_list)
+            valid, _ = card_data.validate_card_list(raw_list, app)
             trade.partner_cards = json.dumps(valid)
             db.session.commit()
             return redirect(url_for('view_trade', trade_id=trade_id))
