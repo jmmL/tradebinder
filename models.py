@@ -33,3 +33,15 @@ class Trade(db.Model):
             'partner_cards': self.partner_cards,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+class CardName(db.Model):
+    __tablename__ = 'card_names'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String, unique=True, nullable=False)
+    updated_at = db.Column(db.DateTime, default=func.now())
+
+class AppMetadata(db.Model):
+    __tablename__ = 'app_metadata'
+    key = db.Column(db.String, primary_key=True)
+    value = db.Column(db.String, nullable=True)
+    updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
