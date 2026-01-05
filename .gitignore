@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+instance/
+*.db
+*.log
+.env
+scryfall_card_names.json

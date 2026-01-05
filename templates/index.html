@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Trade Matcher</title>
+    <link rel="stylesheet" href="https://unpkg.com/mvp.css">
+    <style>
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        textarea { width: 100%; height: 200px; }
+        .valid-preview { color: green; font-size: 0.9em; }
+        .invalid-preview { color: red; font-size: 0.9em; }
+        .hidden { display: none; }
+        .status-box { margin-top: 10px; padding: 10px; border: 1px solid #ddd; background: #f9f9f9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MTG Trade Matcher</h1>
+            <p>Paste your list, send the link, find matches.</p>
+        </header>
+
+        <main>
+            <form action="/create" method="POST">
+                <label>I want to:</label>
+                <select name="mode">
+                    <option value="sell">Sell / Have</option>
+                    <option value="buy">Buy / Want</option>
+                </select>
+
+                <label for="card_list">Paste your card list (one per line):</label>
+                <textarea id="card_list" name="card_list" placeholder="Lightning Bolt&#10;Black Lotus&#10;Island"></textarea>
+
+                <div id="validation-status" class="status-box hidden">
+                    <p><strong>Status:</strong></p>
+                    <div id="valid-count" class="valid-preview"></div>
+                    <div id="unknown-list" class="invalid-preview"></div>
+                </div>
+
+                <button type="submit">Generate Trade Link</button>
+            </form>
+        </main>
+    </div>
+
+    <script>
+        const textarea = document.getElementById('card_list');
+        const statusBox = document.getElementById('validation-status');
+        const validCount = document.getElementById('valid-count');
+        const unknownList = document.getElementById('unknown-list');
+        let timeout = null;
+
+        textarea.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(validateCards, 500);
+        });
+
+        async function validateCards() {
+            const text = textarea.value;
+            if (!text.trim()) {
+                statusBox.classList.add('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cards: text })
+                });
+                const data = await response.json();
+
+                statusBox.classList.remove('hidden');
+                validCount.textContent = `✅ ${data.valid.length} valid cards identified.`;
+
+                if (data.unknown.length > 0) {
+                    unknownList.innerHTML = `❌ <strong>Unknown cards:</strong><br>${data.unknown.join('<br>')}`;
+                } else {
+                    unknownList.textContent = "";
+                }
+
+            } catch (e) {
+                console.error("Validation error", e);
+            }
+        }
+    </script>
+</body>
+</html>
